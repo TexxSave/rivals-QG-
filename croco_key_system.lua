@@ -204,7 +204,7 @@ local function checkKey()
         KeyGui:Destroy()
         
         -- Charger le hub principal
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/YOUR_GITHUB/croco_hub_ultimate.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/TexxSave/rivals-QG-/refs/heads/main/croco_hub_ultimate.lua"))()
     else
         StatusLabel.Text = "❌ Invalid Key! Try again."
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
