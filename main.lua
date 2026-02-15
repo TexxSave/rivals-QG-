@@ -1,130 +1,308 @@
--- Q&J RIVALS HUB
--- Interface mobile avec ESP, Silent Aim, Noclip, Infinite Jump
+-- Q&J RIVALS HUB V2
+-- Toutes les fonctionnalités fonctionnelles
+-- Touche INSERT pour ouvrir/fermer
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootpart = character:WaitForChild("HumanoidRootPart")
 
--- Variables de configuration
+-- Variables
 local settings = {
     redESP = false,
     silentAim = false,
     silentAimChance = 100,
+    silentAimFOV = 200,
     noclip = false,
     infiniteJump = false
 }
 
--- Cleanup
 local connections = {}
 local highlights = {}
+local fovCircle = nil
 
+-- Fonction de nettoyage
 local function cleanup()
     for _, conn in pairs(connections) do
-        if conn then conn:Disconnect() end
+        pcall(function() conn:Disconnect() end)
     end
     for _, hl in pairs(highlights) do
-        if hl then hl:Destroy() end
+        pcall(function() hl:Destroy() end)
     end
     connections = {}
     highlights = {}
 end
 
--- Créer l'interface
+-- Créer le GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "QJRivalsHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999999
 
--- Protection
-local success = pcall(function()
+pcall(function()
     if gethui then
         ScreenGui.Parent = gethui()
     elseif syn and syn.protect_gui then
         syn.protect_gui(ScreenGui)
-        ScreenGui.Parent = game:GetService("CoreGui")
+        ScreenGui.Parent = CoreGui
     else
-        ScreenGui.Parent = game:GetService("CoreGui")
+        ScreenGui.Parent = CoreGui
     end
 end)
-
-if not success then
-    ScreenGui.Parent = player:WaitForChild("PlayerGui")
-end
 
 -- Frame principale
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 450)
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -225)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
+MainFrame.Size = UDim2.new(0, 380, 0, 520)
+MainFrame.Position = UDim2.new(0.5, -190, 0.5, -260)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
 local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 15)
+MainCorner.CornerRadius = UDim.new(0, 12)
 MainCorner.Parent = MainFrame
 
--- Titre
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(255, 40, 40)
+MainStroke.Thickness = 2
+MainStroke.Parent = MainFrame
+
+-- Barre de titre
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 50)
+TitleBar.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 12)
+TitleCorner.Parent = TitleBar
+
+local TitleFix = Instance.new("Frame")
+TitleFix.Size = UDim2.new(1, 0, 0, 25)
+TitleFix.Position = UDim2.new(0, 0, 1, -25)
+TitleFix.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+TitleFix.BorderSizePixel = 0
+TitleFix.Parent = TitleBar
+
 local Title = Instance.new("TextLabel")
-Title.Name = "Title"
-Title.Size = UDim2.new(1, 0, 0, 60)
-Title.Position = UDim2.new(0, 0, 0, 0)
+Title.Size = UDim2.new(1, 0, 1, 0)
 Title.BackgroundTransparency = 1
 Title.Text = "Q&J RIVALS HUB"
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 28
-Title.TextColor3 = Color3.fromRGB(255, 50, 50)
-Title.Parent = MainFrame
+Title.TextSize = 24
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Parent = TitleBar
+
+local Subtitle = Instance.new("TextLabel")
+Subtitle.Size = UDim2.new(1, 0, 0, 20)
+Subtitle.Position = UDim2.new(0, 0, 0, 55)
+Subtitle.BackgroundTransparency = 1
+Subtitle.Text = "Press INSERT to toggle"
+Subtitle.Font = Enum.Font.Gotham
+Subtitle.TextSize = 12
+Subtitle.TextColor3 = Color3.fromRGB(150, 150, 150)
+Subtitle.Parent = MainFrame
+
+-- Container pour les boutons
+local Container = Instance.new("ScrollingFrame")
+Container.Size = UDim2.new(1, -20, 1, -85)
+Container.Position = UDim2.new(0, 10, 0, 75)
+Container.BackgroundTransparency = 1
+Container.BorderSizePixel = 0
+Container.ScrollBarThickness = 4
+Container.ScrollBarImageColor3 = Color3.fromRGB(255, 40, 40)
+Container.CanvasSize = UDim2.new(0, 0, 0, 0)
+Container.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout.Parent = Container
 
 -- Fonction pour créer un bouton toggle
-local function createToggleButton(text, position, callback)
+local yOffset = 0
+local function createToggle(text, callback)
     local Button = Instance.new("TextButton")
-    Button.Size = UDim2.new(0.9, 0, 0, 50)
-    Button.Position = position
-    Button.BackgroundColor3 = Color3.fromRGB(40, 45, 60)
+    Button.Size = UDim2.new(0.95, 0, 0, 55)
+    Button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     Button.BorderSizePixel = 0
-    Button.Text = text .. ": OFF"
-    Button.Font = Enum.Font.GothamBold
-    Button.TextSize = 20
-    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Button.Parent = MainFrame
+    Button.Text = ""
+    Button.AutoButtonColor = false
+    Button.Parent = Container
     
     local Corner = Instance.new("UICorner")
     Corner.CornerRadius = UDim.new(0, 10)
     Corner.Parent = Button
     
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(50, 50, 55)
+    Stroke.Thickness = 1
+    Stroke.Parent = Button
+    
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0.7, 0, 1, 0)
+    Label.Position = UDim2.new(0, 15, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = text
+    Label.Font = Enum.Font.GothamBold
+    Label.TextSize = 18
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Button
+    
+    local Status = Instance.new("TextLabel")
+    Status.Size = UDim2.new(0, 60, 0, 30)
+    Status.Position = UDim2.new(1, -75, 0.5, -15)
+    Status.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    Status.Text = "OFF"
+    Status.Font = Enum.Font.GothamBold
+    Status.TextSize = 14
+    Status.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Status.Parent = Button
+    
+    local StatusCorner = Instance.new("UICorner")
+    StatusCorner.CornerRadius = UDim.new(0, 8)
+    StatusCorner.Parent = Status
+    
     local isEnabled = false
     
     Button.MouseButton1Click:Connect(function()
         isEnabled = not isEnabled
-        Button.Text = text .. ": " .. (isEnabled and "ON" or "OFF")
-        Button.BackgroundColor3 = isEnabled and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(40, 45, 60)
+        Status.Text = isEnabled and "ON" or "OFF"
+        Status.BackgroundColor3 = isEnabled and Color3.fromRGB(255, 40, 40) or Color3.fromRGB(50, 50, 55)
+        Button.BackgroundColor3 = isEnabled and Color3.fromRGB(40, 40, 45) or Color3.fromRGB(30, 30, 35)
+        Stroke.Color = isEnabled and Color3.fromRGB(255, 40, 40) or Color3.fromRGB(50, 50, 55)
         callback(isEnabled)
     end)
     
+    yOffset = yOffset + 65
     return Button
 end
 
--- Red ESP Button
-createToggleButton("Red ESP", UDim2.new(0.05, 0, 0, 80), function(enabled)
+-- Fonction pour créer un slider
+local function createSlider(text, min, max, default, callback)
+    local SliderFrame = Instance.new("Frame")
+    SliderFrame.Size = UDim2.new(0.95, 0, 0, 80)
+    SliderFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    SliderFrame.BorderSizePixel = 0
+    SliderFrame.Parent = Container
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 10)
+    Corner.Parent = SliderFrame
+    
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(50, 50, 55)
+    Stroke.Thickness = 1
+    Stroke.Parent = SliderFrame
+    
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -20, 0, 25)
+    Label.Position = UDim2.new(0, 10, 0, 8)
+    Label.BackgroundTransparency = 1
+    Label.Text = text .. ": " .. default .. "%"
+    Label.Font = Enum.Font.GothamBold
+    Label.TextSize = 16
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = SliderFrame
+    
+    local SliderBG = Instance.new("Frame")
+    SliderBG.Size = UDim2.new(0.9, 0, 0, 10)
+    SliderBG.Position = UDim2.new(0.05, 0, 0, 50)
+    SliderBG.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    SliderBG.BorderSizePixel = 0
+    SliderBG.Parent = SliderFrame
+    
+    local SliderBGCorner = Instance.new("UICorner")
+    SliderBGCorner.CornerRadius = UDim.new(1, 0)
+    SliderBGCorner.Parent = SliderBG
+    
+    local SliderFill = Instance.new("Frame")
+    SliderFill.Size = UDim2.new(default/max, 0, 1, 0)
+    SliderFill.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+    SliderFill.BorderSizePixel = 0
+    SliderFill.Parent = SliderBG
+    
+    local SliderFillCorner = Instance.new("UICorner")
+    SliderFillCorner.CornerRadius = UDim.new(1, 0)
+    SliderFillCorner.Parent = SliderFill
+    
+    local SliderButton = Instance.new("Frame")
+    SliderButton.Size = UDim2.new(0, 20, 0, 20)
+    SliderButton.Position = UDim2.new(default/max, -10, 0.5, -10)
+    SliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    SliderButton.BorderSizePixel = 0
+    SliderButton.Parent = SliderBG
+    
+    local SliderButtonCorner = Instance.new("UICorner")
+    SliderButtonCorner.CornerRadius = UDim.new(1, 0)
+    SliderButtonCorner.Parent = SliderButton
+    
+    local dragging = false
+    
+    local function updateSlider(input)
+        local pos = math.clamp((input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
+        SliderFill.Size = UDim2.new(pos, 0, 1, 0)
+        SliderButton.Position = UDim2.new(pos, -10, 0.5, -10)
+        
+        local value = math.floor(min + (pos * (max - min)))
+        Label.Text = text .. ": " .. value .. "%"
+        callback(value)
+    end
+    
+    SliderBG.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            updateSlider(input)
+        end
+    end)
+    
+    SliderBG.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    table.insert(connections, UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input)
+        end
+    end))
+    
+    yOffset = yOffset + 90
+end
+
+-- Créer les toggles
+createToggle("Red ESP", function(enabled)
     settings.redESP = enabled
     
     if enabled then
-        -- Créer ESP pour tous les joueurs
         local function addESP(plr)
             if plr == player then return end
             
             local function onCharacter(char)
+                task.wait(0.1)
+                if not char then return end
+                
                 if highlights[plr] then
-                    highlights[plr]:Destroy()
+                    pcall(function() highlights[plr]:Destroy() end)
                 end
                 
                 local highlight = Instance.new("Highlight")
-                highlight.Name = "QJRivalsESP"
+                highlight.Name = "QJESP"
                 highlight.Adornee = char
                 highlight.FillColor = Color3.fromRGB(255, 0, 0)
                 highlight.OutlineColor = Color3.fromRGB(150, 0, 0)
@@ -147,192 +325,135 @@ createToggleButton("Red ESP", UDim2.new(0.05, 0, 0, 80), function(enabled)
         end
         
         table.insert(connections, Players.PlayerAdded:Connect(addESP))
+        
+        table.insert(connections, Players.PlayerRemoving:Connect(function(plr)
+            if highlights[plr] then
+                pcall(function() highlights[plr]:Destroy() end)
+                highlights[plr] = nil
+            end
+        end))
     else
-        -- Supprimer tous les ESP
         for _, hl in pairs(highlights) do
-            if hl then hl:Destroy() end
+            pcall(function() hl:Destroy() end)
         end
         highlights = {}
     end
 end)
 
--- Silent Aim Button
-createToggleButton("Silent Aim", UDim2.new(0.05, 0, 0, 150), function(enabled)
+createToggle("Silent Aim", function(enabled)
     settings.silentAim = enabled
-end)
-
--- Silent Aim Hit Chance Slider
-local SliderFrame = Instance.new("Frame")
-SliderFrame.Size = UDim2.new(0.9, 0, 0, 70)
-SliderFrame.Position = UDim2.new(0.05, 0, 0, 220)
-SliderFrame.BackgroundTransparency = 1
-SliderFrame.Parent = MainFrame
-
-local SliderLabel = Instance.new("TextLabel")
-SliderLabel.Size = UDim2.new(1, 0, 0, 25)
-SliderLabel.BackgroundTransparency = 1
-SliderLabel.Text = "Silent Aim Hit Chance: 100%"
-SliderLabel.Font = Enum.Font.Gotham
-SliderLabel.TextSize = 16
-SliderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-SliderLabel.Parent = SliderFrame
-
-local SliderBG = Instance.new("Frame")
-SliderBG.Size = UDim2.new(1, 0, 0, 8)
-SliderBG.Position = UDim2.new(0, 0, 0, 35)
-SliderBG.BackgroundColor3 = Color3.fromRGB(40, 45, 60)
-SliderBG.BorderSizePixel = 0
-SliderBG.Parent = SliderFrame
-
-local SliderBGCorner = Instance.new("UICorner")
-SliderBGCorner.CornerRadius = UDim.new(1, 0)
-SliderBGCorner.Parent = SliderBG
-
-local SliderFill = Instance.new("Frame")
-SliderFill.Size = UDim2.new(1, 0, 1, 0)
-SliderFill.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-SliderFill.BorderSizePixel = 0
-SliderFill.Parent = SliderBG
-
-local SliderFillCorner = Instance.new("UICorner")
-SliderFillCorner.CornerRadius = UDim.new(1, 0)
-SliderFillCorner.Parent = SliderFill
-
-local SliderButton = Instance.new("Frame")
-SliderButton.Size = UDim2.new(0, 25, 0, 25)
-SliderButton.Position = UDim2.new(1, -12.5, 0.5, -12.5)
-SliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-SliderButton.BorderSizePixel = 0
-SliderButton.Parent = SliderBG
-
-local SliderButtonCorner = Instance.new("UICorner")
-SliderButtonCorner.CornerRadius = UDim.new(1, 0)
-SliderButtonCorner.Parent = SliderButton
-
--- Slider dragging
-local dragging = false
-local function updateSlider(input)
-    local pos = math.clamp((input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
-    SliderFill.Size = UDim2.new(pos, 0, 1, 0)
-    SliderButton.Position = UDim2.new(pos, -12.5, 0.5, -12.5)
     
-    local value = math.floor(pos * 100)
+    if enabled and not fovCircle then
+        -- Créer le cercle FOV
+        fovCircle = Drawing.new("Circle")
+        fovCircle.Visible = true
+        fovCircle.Thickness = 2
+        fovCircle.Color = Color3.fromRGB(255, 40, 40)
+        fovCircle.Transparency = 1
+        fovCircle.NumSides = 64
+        fovCircle.Radius = settings.silentAimFOV
+        fovCircle.Filled = false
+        
+        table.insert(connections, RunService.RenderStepped:Connect(function()
+            if settings.silentAim and fovCircle then
+                local screenSize = camera.ViewportSize
+                fovCircle.Position = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
+                fovCircle.Radius = settings.silentAimFOV
+                fovCircle.Visible = true
+            end
+        end))
+    elseif not enabled and fovCircle then
+        fovCircle.Visible = false
+    end
+end)
+
+createSlider("Hit Chance", 0, 100, 100, function(value)
     settings.silentAimChance = value
-    SliderLabel.Text = string.format("Silent Aim Hit Chance: %d%%", value)
-end
+end)
 
-SliderBG.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        updateSlider(input)
+createSlider("FOV Size", 50, 500, 200, function(value)
+    settings.silentAimFOV = value
+    if fovCircle then
+        fovCircle.Radius = value
     end
 end)
 
-SliderBG.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-    end
-end)
-
-table.insert(connections, UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        updateSlider(input)
-    end
-end))
-
--- Noclip Button
-createToggleButton("Noclip", UDim2.new(0.05, 0, 0, 310), function(enabled)
+createToggle("Noclip", function(enabled)
     settings.noclip = enabled
 end)
 
--- Infinite Jump Button
-createToggleButton("Infinite Jump", UDim2.new(0.05, 0, 0, 380), function(enabled)
+createToggle("Infinite Jump", function(enabled)
     settings.infiniteJump = enabled
 end)
 
--- Rendre draggable
-local draggingUI = false
-local dragInput, dragStart, startPos
+-- Mettre à jour la taille du canvas
+Container.CanvasSize = UDim2.new(0, 0, 0, yOffset + 10)
 
-MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingUI = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                draggingUI = false
-            end
-        end)
-    end
-end)
+-- Fonctionnalités actives
 
-MainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-table.insert(connections, UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and draggingUI then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-end))
-
--- Fonctionnalités
-
--- Silent Aim
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
+-- Silent Aim avec hook
+local function getClosestPlayerInFOV()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    local screenCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
     
-    if settings.silentAim and method == "FireServer" and self.Name == "RemoteEvent" then
-        -- Vérifier si c'est un event de tir (à adapter selon ton jeu)
-        if math.random(1, 100) <= settings.silentAimChance then
-            local target = nil
-            local closestDistance = math.huge
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character then
+            local head = plr.Character:FindFirstChild("Head")
+            local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
             
-            for _, plr in pairs(Players:GetPlayers()) do
-                if plr ~= player and plr.Character and plr.Character:FindFirstChild("Head") then
-                    local head = plr.Character.Head
-                    local distance = (head.Position - camera.CFrame.Position).Magnitude
+            if head and humanoid and humanoid.Health > 0 then
+                local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
+                
+                if onScreen then
+                    local screenPos2D = Vector2.new(screenPos.X, screenPos.Y)
+                    local distance = (screenPos2D - screenCenter).Magnitude
                     
-                    if distance < closestDistance then
-                        closestDistance = distance
-                        target = head
+                    if distance <= settings.silentAimFOV and distance < shortestDistance then
+                        closestPlayer = plr
+                        shortestDistance = distance
                     end
-                end
-            end
-            
-            if target then
-                -- Modifier les arguments pour viser la tête
-                if typeof(args[1]) == "Vector3" then
-                    args[1] = target.Position
-                elseif typeof(args[2]) == "Vector3" then
-                    args[2] = target.Position
                 end
             end
         end
     end
     
-    return oldNamecall(self, unpack(args))
+    return closestPlayer
+end
+
+-- Hook pour Mouse
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+setreadonly(mt, false)
+
+mt.__index = newcclosure(function(self, key)
+    if settings.silentAim and tostring(self) == "Mouse" and (key == "Hit" or key == "Target") then
+        local target = getClosestPlayerInFOV()
+        
+        if target and math.random(1, 100) <= settings.silentAimChance then
+            local head = target.Character and target.Character:FindFirstChild("Head")
+            if head then
+                if key == "Hit" then
+                    return CFrame.new(head.Position)
+                elseif key == "Target" then
+                    return head
+                end
+            end
+        end
+    end
+    
+    return oldIndex(self, key)
 end)
+
+setreadonly(mt, true)
 
 -- Noclip
 table.insert(connections, RunService.Stepped:Connect(function()
     if settings.noclip then
-        local character = player.Character
-        if character then
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
+        local char = player.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
                     part.CanCollide = false
                 end
             end
@@ -343,17 +464,36 @@ end))
 -- Infinite Jump
 table.insert(connections, UserInputService.JumpRequest:Connect(function()
     if settings.infiniteJump then
-        local character = player.Character
-        if character then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        local char = player.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end
     end
 end))
 
--- Cleanup à la destruction du GUI
-ScreenGui.Destroying:Connect(cleanup)
+-- Mise à jour du personnage
+table.insert(connections, player.CharacterAdded:Connect(function(char)
+    character = char
+    humanoid = char:WaitForChild("Humanoid")
+    rootpart = char:WaitForChild("HumanoidRootPart")
+end))
 
-print("Q&J Rivals Hub chargé avec succès!")
+-- Toggle avec INSERT
+table.insert(connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.Insert then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end))
+
+-- Cleanup
+ScreenGui.Destroying:Connect(function()
+    cleanup()
+    if fovCircle then
+        fovCircle:Remove()
+    end
+end)
+
+print("Q&J Rivals Hub V2 chargé! Appuie sur INSERT pour ouvrir/fermer")
