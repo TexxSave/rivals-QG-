@@ -15,7 +15,6 @@ local mouse = player:GetMouse()
 local settings = {
     redESP = false,
     aimbot = false,
-    aimbotKey = Enum.KeyCode.E,
     aimbotFOV = 200,
     aimbotSmooth = 5
 }
@@ -352,7 +351,7 @@ createToggle("Red ESP", UDim2.new(0, 0, 0, 10), function(enabled)
 end)
 
 -- Aimbot Lock Toggle
-createToggle("Aimbot Lock (Hold E)", UDim2.new(0, 0, 0, 80), function(enabled)
+createToggle("Aimbot Lock (Right Click)", UDim2.new(0, 0, 0, 80), function(enabled)
     settings.aimbot = enabled
     
     if enabled then
@@ -427,9 +426,9 @@ local function getClosestPlayerInFOV()
     return closestPlayer
 end
 
--- Détection de la touche E
+-- Détection du clic droit
 table.insert(connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == settings.aimbotKey then
+    if not gameProcessed and input.UserInputType == Enum.UserInputType.MouseButton2 then
         isAimbotKeyDown = true
         if settings.aimbot then
             lockedTarget = getClosestPlayerInFOV()
@@ -438,7 +437,7 @@ table.insert(connections, UserInputService.InputBegan:Connect(function(input, ga
 end))
 
 table.insert(connections, UserInputService.InputEnded:Connect(function(input, gameProcessed)
-    if input.KeyCode == settings.aimbotKey then
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
         isAimbotKeyDown = false
         lockedTarget = nil
     end
@@ -502,4 +501,4 @@ ScreenGui.Destroying:Connect(function()
 end)
 
 print("🐊 Croco Hub chargé!")
-print("Maintiens E pour lock l'aimbot")
+print("Maintiens CLIC DROIT pour lock l'aimbot")
