@@ -1,6 +1,5 @@
--- Q&J RIVALS HUB V2
--- Toutes les fonctionnalités fonctionnelles
--- Touche INSERT pour ouvrir/fermer
+-- CROCO HUB 🐊
+-- ESP + Aimbot Lock
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -10,23 +9,22 @@ local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local rootpart = character:WaitForChild("HumanoidRootPart")
+local mouse = player:GetMouse()
 
 -- Variables
 local settings = {
     redESP = false,
-    silentAim = false,
-    silentAimChance = 100,
-    silentAimFOV = 200,
-    noclip = false,
-    infiniteJump = false
+    aimbot = false,
+    aimbotKey = Enum.KeyCode.E,
+    aimbotFOV = 200,
+    aimbotSmooth = 5
 }
 
 local connections = {}
 local highlights = {}
+local lockedTarget = nil
 local fovCircle = nil
+local isAimbotKeyDown = false
 
 -- Fonction de nettoyage
 local function cleanup()
@@ -38,11 +36,12 @@ local function cleanup()
     end
     connections = {}
     highlights = {}
+    lockedTarget = nil
 end
 
 -- Créer le GUI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "QJRivalsHub"
+ScreenGui.Name = "CrocoHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999999
@@ -61,8 +60,8 @@ end)
 -- Frame principale
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 380, 0, 520)
-MainFrame.Position = UDim2.new(0.5, -190, 0.5, -260)
+MainFrame.Size = UDim2.new(0, 400, 0, 450)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -74,14 +73,14 @@ MainCorner.CornerRadius = UDim.new(0, 12)
 MainCorner.Parent = MainFrame
 
 local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(255, 40, 40)
+MainStroke.Color = Color3.fromRGB(50, 200, 100)
 MainStroke.Thickness = 2
 MainStroke.Parent = MainFrame
 
 -- Barre de titre
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 50)
-TitleBar.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
 TitleBar.BorderSizePixel = 0
 TitleBar.Parent = MainFrame
 
@@ -92,50 +91,64 @@ TitleCorner.Parent = TitleBar
 local TitleFix = Instance.new("Frame")
 TitleFix.Size = UDim2.new(1, 0, 0, 25)
 TitleFix.Position = UDim2.new(0, 0, 1, -25)
-TitleFix.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+TitleFix.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
 TitleFix.BorderSizePixel = 0
 TitleFix.Parent = TitleBar
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 1, 0)
+Title.Size = UDim2.new(0.7, 0, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Q&J RIVALS HUB"
+Title.Text = "🐊 CROCO HUB"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 24
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TitleBar
 
-local Subtitle = Instance.new("TextLabel")
-Subtitle.Size = UDim2.new(1, 0, 0, 20)
-Subtitle.Position = UDim2.new(0, 0, 0, 55)
-Subtitle.BackgroundTransparency = 1
-Subtitle.Text = "Press INSERT to toggle"
-Subtitle.Font = Enum.Font.Gotham
-Subtitle.TextSize = 12
-Subtitle.TextColor3 = Color3.fromRGB(150, 150, 150)
-Subtitle.Parent = MainFrame
+-- Bouton Toggle (minimiser)
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 35, 0, 35)
+ToggleBtn.Position = UDim2.new(1, -80, 0.5, -17.5)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
+ToggleBtn.Text = "—"
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 20
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Parent = TitleBar
+
+local ToggleBtnCorner = Instance.new("UICorner")
+ToggleBtnCorner.CornerRadius = UDim.new(0, 8)
+ToggleBtnCorner.Parent = ToggleBtn
+
+-- Bouton Close
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 35, 0, 35)
+CloseBtn.Position = UDim2.new(1, -40, 0.5, -17.5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.Text = "✕"
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 20
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Parent = TitleBar
+
+local CloseBtnCorner = Instance.new("UICorner")
+CloseBtnCorner.CornerRadius = UDim.new(0, 8)
+CloseBtnCorner.Parent = CloseBtn
 
 -- Container pour les boutons
-local Container = Instance.new("ScrollingFrame")
-Container.Size = UDim2.new(1, -20, 1, -85)
-Container.Position = UDim2.new(0, 10, 0, 75)
+local Container = Instance.new("Frame")
+Container.Size = UDim2.new(1, -20, 1, -70)
+Container.Position = UDim2.new(0, 10, 0, 60)
 Container.BackgroundTransparency = 1
 Container.BorderSizePixel = 0
-Container.ScrollBarThickness = 4
-Container.ScrollBarImageColor3 = Color3.fromRGB(255, 40, 40)
-Container.CanvasSize = UDim2.new(0, 0, 0, 0)
 Container.Parent = MainFrame
 
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.Padding = UDim.new(0, 10)
-UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-UIListLayout.Parent = Container
-
 -- Fonction pour créer un bouton toggle
-local yOffset = 0
-local function createToggle(text, callback)
+local function createToggle(text, position, callback)
     local Button = Instance.new("TextButton")
-    Button.Size = UDim2.new(0.95, 0, 0, 55)
+    Button.Size = UDim2.new(1, 0, 0, 60)
+    Button.Position = position
     Button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     Button.BorderSizePixel = 0
     Button.Text = ""
@@ -152,23 +165,23 @@ local function createToggle(text, callback)
     Stroke.Parent = Button
     
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(0.7, 0, 1, 0)
+    Label.Size = UDim2.new(0.65, 0, 1, 0)
     Label.Position = UDim2.new(0, 15, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = text
     Label.Font = Enum.Font.GothamBold
-    Label.TextSize = 18
+    Label.TextSize = 20
     Label.TextColor3 = Color3.fromRGB(255, 255, 255)
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Button
     
     local Status = Instance.new("TextLabel")
-    Status.Size = UDim2.new(0, 60, 0, 30)
-    Status.Position = UDim2.new(1, -75, 0.5, -15)
+    Status.Size = UDim2.new(0, 70, 0, 35)
+    Status.Position = UDim2.new(1, -85, 0.5, -17.5)
     Status.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
     Status.Text = "OFF"
     Status.Font = Enum.Font.GothamBold
-    Status.TextSize = 14
+    Status.TextSize = 16
     Status.TextColor3 = Color3.fromRGB(255, 255, 255)
     Status.Parent = Button
     
@@ -181,20 +194,20 @@ local function createToggle(text, callback)
     Button.MouseButton1Click:Connect(function()
         isEnabled = not isEnabled
         Status.Text = isEnabled and "ON" or "OFF"
-        Status.BackgroundColor3 = isEnabled and Color3.fromRGB(255, 40, 40) or Color3.fromRGB(50, 50, 55)
+        Status.BackgroundColor3 = isEnabled and Color3.fromRGB(50, 200, 100) or Color3.fromRGB(50, 50, 55)
         Button.BackgroundColor3 = isEnabled and Color3.fromRGB(40, 40, 45) or Color3.fromRGB(30, 30, 35)
-        Stroke.Color = isEnabled and Color3.fromRGB(255, 40, 40) or Color3.fromRGB(50, 50, 55)
+        Stroke.Color = isEnabled and Color3.fromRGB(50, 200, 100) or Color3.fromRGB(50, 50, 55)
         callback(isEnabled)
     end)
     
-    yOffset = yOffset + 65
     return Button
 end
 
 -- Fonction pour créer un slider
-local function createSlider(text, min, max, default, callback)
+local function createSlider(text, position, min, max, default, callback)
     local SliderFrame = Instance.new("Frame")
-    SliderFrame.Size = UDim2.new(0.95, 0, 0, 80)
+    SliderFrame.Size = UDim2.new(1, 0, 0, 85)
+    SliderFrame.Position = position
     SliderFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     SliderFrame.BorderSizePixel = 0
     SliderFrame.Parent = Container
@@ -210,18 +223,18 @@ local function createSlider(text, min, max, default, callback)
     
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(1, -20, 0, 25)
-    Label.Position = UDim2.new(0, 10, 0, 8)
+    Label.Position = UDim2.new(0, 10, 0, 10)
     Label.BackgroundTransparency = 1
-    Label.Text = text .. ": " .. default .. "%"
+    Label.Text = text .. ": " .. default
     Label.Font = Enum.Font.GothamBold
-    Label.TextSize = 16
+    Label.TextSize = 18
     Label.TextColor3 = Color3.fromRGB(255, 255, 255)
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = SliderFrame
     
     local SliderBG = Instance.new("Frame")
-    SliderBG.Size = UDim2.new(0.9, 0, 0, 10)
-    SliderBG.Position = UDim2.new(0.05, 0, 0, 50)
+    SliderBG.Size = UDim2.new(0.9, 0, 0, 12)
+    SliderBG.Position = UDim2.new(0.05, 0, 0, 55)
     SliderBG.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
     SliderBG.BorderSizePixel = 0
     SliderBG.Parent = SliderFrame
@@ -231,8 +244,8 @@ local function createSlider(text, min, max, default, callback)
     SliderBGCorner.Parent = SliderBG
     
     local SliderFill = Instance.new("Frame")
-    SliderFill.Size = UDim2.new(default/max, 0, 1, 0)
-    SliderFill.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+    SliderFill.Size = UDim2.new((default - min)/(max - min), 0, 1, 0)
+    SliderFill.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
     SliderFill.BorderSizePixel = 0
     SliderFill.Parent = SliderBG
     
@@ -241,8 +254,8 @@ local function createSlider(text, min, max, default, callback)
     SliderFillCorner.Parent = SliderFill
     
     local SliderButton = Instance.new("Frame")
-    SliderButton.Size = UDim2.new(0, 20, 0, 20)
-    SliderButton.Position = UDim2.new(default/max, -10, 0.5, -10)
+    SliderButton.Size = UDim2.new(0, 22, 0, 22)
+    SliderButton.Position = UDim2.new((default - min)/(max - min), -11, 0.5, -11)
     SliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     SliderButton.BorderSizePixel = 0
     SliderButton.Parent = SliderBG
@@ -256,10 +269,10 @@ local function createSlider(text, min, max, default, callback)
     local function updateSlider(input)
         local pos = math.clamp((input.Position.X - SliderBG.AbsolutePosition.X) / SliderBG.AbsoluteSize.X, 0, 1)
         SliderFill.Size = UDim2.new(pos, 0, 1, 0)
-        SliderButton.Position = UDim2.new(pos, -10, 0.5, -10)
+        SliderButton.Position = UDim2.new(pos, -11, 0.5, -11)
         
         local value = math.floor(min + (pos * (max - min)))
-        Label.Text = text .. ": " .. value .. "%"
+        Label.Text = text .. ": " .. value
         callback(value)
     end
     
@@ -281,12 +294,10 @@ local function createSlider(text, min, max, default, callback)
             updateSlider(input)
         end
     end))
-    
-    yOffset = yOffset + 90
 end
 
--- Créer les toggles
-createToggle("Red ESP", function(enabled)
+-- Red ESP Toggle
+createToggle("Red ESP", UDim2.new(0, 0, 0, 10), function(enabled)
     settings.redESP = enabled
     
     if enabled then
@@ -302,7 +313,7 @@ createToggle("Red ESP", function(enabled)
                 end
                 
                 local highlight = Instance.new("Highlight")
-                highlight.Name = "QJESP"
+                highlight.Name = "CrocoESP"
                 highlight.Adornee = char
                 highlight.FillColor = Color3.fromRGB(255, 0, 0)
                 highlight.OutlineColor = Color3.fromRGB(150, 0, 0)
@@ -340,58 +351,53 @@ createToggle("Red ESP", function(enabled)
     end
 end)
 
-createToggle("Silent Aim", function(enabled)
-    settings.silentAim = enabled
+-- Aimbot Lock Toggle
+createToggle("Aimbot Lock (Hold E)", UDim2.new(0, 0, 0, 80), function(enabled)
+    settings.aimbot = enabled
     
-    if enabled and not fovCircle then
+    if enabled then
         -- Créer le cercle FOV
-        fovCircle = Drawing.new("Circle")
-        fovCircle.Visible = true
-        fovCircle.Thickness = 2
-        fovCircle.Color = Color3.fromRGB(255, 40, 40)
-        fovCircle.Transparency = 1
-        fovCircle.NumSides = 64
-        fovCircle.Radius = settings.silentAimFOV
-        fovCircle.Filled = false
+        if not fovCircle then
+            fovCircle = Drawing.new("Circle")
+            fovCircle.Visible = true
+            fovCircle.Thickness = 2
+            fovCircle.Color = Color3.fromRGB(50, 200, 100)
+            fovCircle.Transparency = 1
+            fovCircle.NumSides = 64
+            fovCircle.Radius = settings.aimbotFOV
+            fovCircle.Filled = false
+        end
         
         table.insert(connections, RunService.RenderStepped:Connect(function()
-            if settings.silentAim and fovCircle then
+            if settings.aimbot and fovCircle then
                 local screenSize = camera.ViewportSize
                 fovCircle.Position = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
-                fovCircle.Radius = settings.silentAimFOV
+                fovCircle.Radius = settings.aimbotFOV
                 fovCircle.Visible = true
             end
         end))
-    elseif not enabled and fovCircle then
-        fovCircle.Visible = false
+    else
+        if fovCircle then
+            fovCircle.Visible = false
+        end
+        lockedTarget = nil
     end
 end)
 
-createSlider("Hit Chance", 0, 100, 100, function(value)
-    settings.silentAimChance = value
-end)
-
-createSlider("FOV Size", 50, 500, 200, function(value)
-    settings.silentAimFOV = value
+-- FOV Size Slider
+createSlider("FOV Size", UDim2.new(0, 0, 0, 150), 50, 500, 200, function(value)
+    settings.aimbotFOV = value
     if fovCircle then
         fovCircle.Radius = value
     end
 end)
 
-createToggle("Noclip", function(enabled)
-    settings.noclip = enabled
+-- Smoothness Slider
+createSlider("Aimbot Smoothness", UDim2.new(0, 0, 0, 245), 1, 20, 5, function(value)
+    settings.aimbotSmooth = value
 end)
 
-createToggle("Infinite Jump", function(enabled)
-    settings.infiniteJump = enabled
-end)
-
--- Mettre à jour la taille du canvas
-Container.CanvasSize = UDim2.new(0, 0, 0, yOffset + 10)
-
--- Fonctionnalités actives
-
--- Silent Aim avec hook
+-- Fonction pour trouver le joueur le plus proche dans le FOV
 local function getClosestPlayerInFOV()
     local closestPlayer = nil
     local shortestDistance = math.huge
@@ -409,7 +415,7 @@ local function getClosestPlayerInFOV()
                     local screenPos2D = Vector2.new(screenPos.X, screenPos.Y)
                     local distance = (screenPos2D - screenCenter).Magnitude
                     
-                    if distance <= settings.silentAimFOV and distance < shortestDistance then
+                    if distance <= settings.aimbotFOV and distance < shortestDistance then
                         closestPlayer = plr
                         shortestDistance = distance
                     end
@@ -421,72 +427,71 @@ local function getClosestPlayerInFOV()
     return closestPlayer
 end
 
--- Hook pour Mouse
-local mt = getrawmetatable(game)
-local oldIndex = mt.__index
-setreadonly(mt, false)
-
-mt.__index = newcclosure(function(self, key)
-    if settings.silentAim and tostring(self) == "Mouse" and (key == "Hit" or key == "Target") then
-        local target = getClosestPlayerInFOV()
-        
-        if target and math.random(1, 100) <= settings.silentAimChance then
-            local head = target.Character and target.Character:FindFirstChild("Head")
-            if head then
-                if key == "Hit" then
-                    return CFrame.new(head.Position)
-                elseif key == "Target" then
-                    return head
-                end
-            end
+-- Détection de la touche E
+table.insert(connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == settings.aimbotKey then
+        isAimbotKeyDown = true
+        if settings.aimbot then
+            lockedTarget = getClosestPlayerInFOV()
         end
     end
+end))
+
+table.insert(connections, UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if input.KeyCode == settings.aimbotKey then
+        isAimbotKeyDown = false
+        lockedTarget = nil
+    end
+end))
+
+-- Aimbot Loop
+table.insert(connections, RunService.RenderStepped:Connect(function()
+    if settings.aimbot and isAimbotKeyDown and lockedTarget then
+        local target = lockedTarget
+        
+        if target.Character then
+            local head = target.Character:FindFirstChild("Head")
+            local humanoid = target.Character:FindFirstChildOfClass("Humanoid")
+            
+            if head and humanoid and humanoid.Health > 0 then
+                local targetPos = head.Position
+                local currentCFrame = camera.CFrame
+                local targetCFrame = CFrame.new(currentCFrame.Position, targetPos)
+                
+                -- Smooth aim
+                camera.CFrame = currentCFrame:Lerp(targetCFrame, 1 / settings.aimbotSmooth)
+            else
+                lockedTarget = nil
+            end
+        else
+            lockedTarget = nil
+        end
+    end
+end))
+
+-- Bouton Toggle (minimiser)
+local isMinimized = false
+ToggleBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    Container.Visible = not isMinimized
     
-    return oldIndex(self, key)
+    if isMinimized then
+        MainFrame.Size = UDim2.new(0, 400, 0, 50)
+        ToggleBtn.Text = "+"
+    else
+        MainFrame.Size = UDim2.new(0, 400, 0, 450)
+        ToggleBtn.Text = "—"
+    end
 end)
 
-setreadonly(mt, true)
-
--- Noclip
-table.insert(connections, RunService.Stepped:Connect(function()
-    if settings.noclip then
-        local char = player.Character
-        if char then
-            for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
-                end
-            end
-        end
+-- Bouton Close
+CloseBtn.MouseButton1Click:Connect(function()
+    cleanup()
+    if fovCircle then
+        fovCircle:Remove()
     end
-end))
-
--- Infinite Jump
-table.insert(connections, UserInputService.JumpRequest:Connect(function()
-    if settings.infiniteJump then
-        local char = player.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
-        end
-    end
-end))
-
--- Mise à jour du personnage
-table.insert(connections, player.CharacterAdded:Connect(function(char)
-    character = char
-    humanoid = char:WaitForChild("Humanoid")
-    rootpart = char:WaitForChild("HumanoidRootPart")
-end))
-
--- Toggle avec INSERT
-table.insert(connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.Insert then
-        MainFrame.Visible = not MainFrame.Visible
-    end
-end))
+    ScreenGui:Destroy()
+end)
 
 -- Cleanup
 ScreenGui.Destroying:Connect(function()
@@ -496,4 +501,5 @@ ScreenGui.Destroying:Connect(function()
     end
 end)
 
-print("Q&J Rivals Hub V2 chargé! Appuie sur INSERT pour ouvrir/fermer")
+print("🐊 Croco Hub chargé!")
+print("Maintiens E pour lock l'aimbot")
