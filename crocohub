@@ -14,7 +14,7 @@ local player = Players.LocalPlayer
 -- ========================================
 
 -- Webhook Discord pour vérifier les clés
-local VERIFY_WEBHOOK = "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+local VERIFY_WEBHOOK = "https://discord.com/api/webhooks/1473660736222793800/4iLlAMxJbsqQ5Us2z3eEwKapmm9oX8FiKCrREmndxPstzT_WYIeQhe_InviXz-Hva2Wr"
 
 -- Lien Discord pour obtenir une clé
 local DISCORD_INVITE = "https://discord.gg/bES4cJPgqc"
@@ -301,7 +301,7 @@ end
 local function loadHub()
     closeFrame()
     -- Charger ton hub
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/TON_GITHUB/CROCO_HUB.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/TexxSave/rivals-QG-/refs/heads/main/file.lua"))()
 end
 
 -- ========================================
